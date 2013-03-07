@@ -5,29 +5,31 @@ module ActAsImportable::Base
 
   module ClassMethods
 
-    ##
-    # Imports a data file into a model
-    # Existing records are found by the :uid.
-    # This can be changed by providing the :unique_identifier option or overriding the default_unique_identifier class method.
-    def import_file(file, options = {})
-      import_text(File.read(file), options)
+    def import_csv_file(file, options = {})
+      import_csv_text(File.read(file), options)
     end
 
-    ##
-    # Imports csv text into a model
-    def import_text(text, options = {})
+    def import_csv_text(text, options = {})
       csv = ::CSV.parse(text, :headers => true)
-      csv.each do |row|
+      results = csv.map do |row|
         row = row.to_hash.with_indifferent_access
         import_record(row, options)
       end
     end
 
+    # Creates or updates a model record
+    # Existing records are found by the column(s) specified by the :uid option (default 'id').
+    # If the values for the uid columns are not provided the row will be ignored.
+    # If uid is set to nil it will import the row data as a new record.
     def import_record(row, options = {})
+      options = options.reverse_merge!(@default_import_options)
       row = filter_columns(row, options)
-      record = find_existing_record(row, options)
-      remove_unique_identifiers(row, options) if record
-      record ||= self.new()
+      record = find_or_create_by(uid_values(row, options))
+      remove_uid_values_from_row(row, options)
+      update_record(record, row)
+    end
+
+    def update_record(record, row)
       update_associations(record, row)
       record.update_attributes(row)
       record.save!
@@ -39,55 +41,46 @@ module ActAsImportable::Base
       row
     end
 
-    def remove_unique_identifiers(row, options = {})
-      Array(options[:unique_identifier]).each do |field|
+    def uid_values(row, options)
+      Hash[Array(options[:uid]).map { |k| [k, row[k.to_sym]] }]
+    end
+
+    def remove_uid_values_from_row(row, options = {})
+      Array(options[:uid]).each do |field|
         row.delete(field)
       end
     end
 
-    ##
-    # Updates any associations specified in the import data.
-    # Associations are specified in the header by separating the association and the field by a '.'
-    def update_associations(existing, row)
+    def update_associations(record, row)
       row.each_key do |key|
         key = key.to_s
         if key.include?('.')
-          association_name = key.split('.').first
-          field = key.split('.').last
-          association = self.reflect_on_association(association_name.to_sym)
-          association_value = association.klass.where("#{field} = ?", row[key]).first
-          existing.send("#{association_name}=", association_value) if association_value
+          update_association(record, key, row[key])
           row.delete(key)
         end
       end
     end
 
-    ##
-    # Fetches the existing record based on the identifier field(s) specified by the :unique_identifier option.
-    # Defaults to the field specified by 'default_unique_identifier'
-    def find_existing_record(row, options = {})
-      return unless options[:unique_identifier]
-      fields = Array(options[:unique_identifier])
-      fields.inject(self.scoped.readonly(false)) { |scope, field|
-        add_scope_for_field(scope, field.to_s, row)
-      }.first
+    def update_association(record, key, value)
+      association_name = key.split('.').first
+      uid_field = key.split('.').last
+      value = find_association_value_with_attribute(association_name, uid_field => value)
+      record.send("#{association_name}=", value) if value
     end
 
-    ##
-    # Refines an existing scope to include a new field
-    # The field can traverse 'belongs_to' associations by joining the association and field with a '.'
-    # The query value should be found within the hash with the field as the key.
-    # Notes: currently only supports field paths through one association.
-    def add_scope_for_field(scope, field, hash)
-      value = hash[field]
-      return scope unless value
-      if field.include?('.')
-        association = field.split('.').first
-        field_name = field.split('.').last
-        scope.joins(association.to_sym).where("#{association.pluralize}.#{field_name} = ?", value)
-      else
-        scope.where("#{field} = ?", value)
-      end
+    def find_association_value_with_attribute(name, attribute)
+      association = self.reflect_on_association(name.to_sym)
+      association.klass.where(attribute).first
+    end
+
+    # Note: This will be available by default in rails 4
+    def find_or_create_by(attributes, &block)
+      find_by(attributes) || create(attributes, &block)
+    end
+
+    # Note: This will by provided by default in rails 4
+    def find_by(attributes)
+      where(attributes).first
     end
 
   end

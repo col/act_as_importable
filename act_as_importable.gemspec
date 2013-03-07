@@ -8,8 +8,8 @@ Gem::Specification.new do |gem|
   gem.version       = ActAsImportable::VERSION
   gem.authors       = ["Colin Harris"]
   gem.email         = ["col.w.harris@gmail.com"]
-  gem.description   = %q{Helps import models from CSV files.}
-  gem.summary       = %q{Helps import models from CSV files.}
+  gem.description   = %q{Helps import records from CSV files.}
+  gem.summary       = %q{Helps import records from CSV files.}
   gem.homepage      = "https://github.com/Col/act_as_importable"
 
   gem.files         = `git ls-files`.split($/)

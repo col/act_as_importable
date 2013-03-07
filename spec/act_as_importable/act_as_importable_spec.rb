@@ -18,7 +18,7 @@ ActiveRecord::Base.connection.create_table(:items) do |t|
 end
 
 class Item < ActiveRecord::Base
-  act_as_importable
+  act_as_importable :uid => 'name'
 
   belongs_to :category
 end
@@ -37,15 +37,22 @@ describe "an act_as_importable model" do
 
   subject { Item }
 
-  it { should respond_to :import_file }
-  it { should respond_to :import_text }
+  it { should respond_to :import_csv_file }
+  it { should respond_to :import_csv_text }
   it { should respond_to :import_record }
+  it { should respond_to :default_import_options }
+
+  let(:default_options) { {:uid => 'name'} }
+
+  it "should have the correct default import options" do
+    Item.default_import_options.should == default_options
+  end
 
   describe "import csv file" do
     let(:file) { 'spec/fixtures/items.csv' }
-    it 'should call import_text with context of file' do
-      Item.should_receive(:import_text).with(File.read(file), {})
-      Item.import_file(file)
+    it 'should call import_text with contents of file' do
+      Item.should_receive(:import_csv_text).with(File.read(file), {})
+      Item.import_csv_file(file)
     end
   end
 
@@ -54,7 +61,7 @@ describe "an act_as_importable model" do
     it 'should call import_record with row hashes' do
       Item.should_receive(:import_record).with({'name' => 'Beer', 'price' => '2.5'}, {}).once
       Item.should_receive(:import_record).with({'name' => 'Apple', 'price' => '0.5'}, {}).once
-      Item.import_text(text)
+      Item.import_csv_text(text)
     end
   end
 
@@ -70,11 +77,11 @@ describe "an act_as_importable model" do
         @existing_item = Item.create!(:name => 'Beer', :price => 1.0)
       end
       it "should update an existing record with matching unique identifier" do
-        Item.import_record(row, :unique_identifier => 'name')
+        Item.import_record(row, :uid => 'name')
         @existing_item.reload.price.should == 2.5
       end
       it "should not create a new item" do
-        expect { Item.import_record(row, :unique_identifier => 'name') }.to change { Item.count }.by(0)
+        expect { Item.import_record(row, :uid => 'name') }.to change { Item.count }.by(0)
       end
     end
   end
@@ -94,7 +101,7 @@ describe "an act_as_importable model" do
     let(:row) { {:name => 'Beer', :price => 2.5} }
 
     it 'should filter columns when importing each record' do
-      Item.should_receive(:filter_columns).with(row, {}).and_return(row)
+      Item.should_receive(:filter_columns).with(row, default_options).and_return(row)
       Item.import_record(row)
     end
 
