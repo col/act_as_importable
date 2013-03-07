@@ -1,4 +1,5 @@
 require 'active_support'
+require 'act_as_importable'
 
 module ActAsImportable::Config
   extend ActiveSupport::Concern

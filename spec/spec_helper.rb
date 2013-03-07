@@ -9,6 +9,7 @@ require 'active_record'
 require 'active_support'
 require 'act_as_importable'
 require 'rspec'
+require 'rspec/autorun'
 
 root = File.expand_path(File.join(File.dirname(__FILE__), '..'))
 ActiveRecord::Base.establish_connection(

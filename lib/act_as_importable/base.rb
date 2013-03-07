@@ -1,4 +1,5 @@
 require 'active_support'
+require 'csv'
 
 module ActAsImportable::Base
   extend ActiveSupport::Concern
@@ -84,5 +85,4 @@ module ActAsImportable::Base
     end
 
   end
-
 end

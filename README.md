@@ -1,6 +1,6 @@
 # ActAsImportable
 
-Help you easily import models from a CSV file.
+Helps you easily import records from a CSV file.
 
 ## Installation
 

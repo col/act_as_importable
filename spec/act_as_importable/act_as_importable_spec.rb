@@ -18,6 +18,9 @@ ActiveRecord::Base.connection.create_table(:items) do |t|
 end
 
 class Item < ActiveRecord::Base
+  # This line isn't needed in a real Rails app.
+  include ActAsImportable::Config
+
   act_as_importable :uid => 'name'
 
   belongs_to :category

@@ -1,4 +1,4 @@
-require 'act_as_importable'
+require 'act_as_importable/config'
 require 'rails'
 
 module ActAsImportable
