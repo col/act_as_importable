@@ -75,17 +75,53 @@ describe "an act_as_importable model" do
       expect { Item.import_record(row) }.to change{Item.count}.by(1)
     end
 
-    describe "unique identifier" do
-      before :each do
-        @existing_item = Item.create!(:name => 'Beer', :price => 1.0)
+    describe "unique identifier (uid) option" do
+
+      context "record exists with matching uid" do
+        before :each do
+          @existing_item = Item.create!(:name => 'Beer', :price => 1.0)
+        end
+        it "should update an existing record with matching uid" do
+          Item.import_record(row, :uid => :name)
+          @existing_item.reload.price.should == 2.5
+        end
+        it "should not create a new item" do
+          expect { Item.import_record(row, :uid => 'name') }.to change { Item.count }.by(0)
+        end
       end
-      it "should update an existing record with matching unique identifier" do
-        Item.import_record(row, :uid => 'name')
-        @existing_item.reload.price.should == 2.5
+
+      context "record doesn't exist with matching uid" do
+        it "should create a new record" do
+          expect { Item.import_record(row, :uid => :name) }.to change { Item.count }.by(1)
+        end
+        it "should assign the uid values to the record" do
+          Item.import_record(row, :uid => :name)
+          Item.first.name.should == 'Beer'
+        end
       end
-      it "should not create a new item" do
-        expect { Item.import_record(row, :uid => 'name') }.to change { Item.count }.by(0)
+
+      context "support for multiple uid columns" do
+        let(:category1) { Category.create!(:name => 'Beverage') }
+        let(:category2) { Category.create!(:name => 'Beers') }
+        let(:row) { { :name => 'Beer', :'category.name' => category2.name, :price => 3.2}}
+        before :each do
+          @existing1 = Item.create!(:name => 'Beer', :price => 1.0, :category => category1)
+          @existing2 = Item.create!(:name => 'Beer', :price => 2.5, :category => category2)
+        end
+
+        it "should match existing records with multiple uid columns" do
+          Item.import_record(row, :uid => [:name, :'category.name'])
+          @existing2.reload.price.should == 3.2
+        end
+
+        it "should allow uid column value to come from default values" do
+          row = { :name => 'Beer', :price => 3.2 }
+          Item.import_record(row, :uid => [:name, :'category.name'], :default_values => { :'category.name' => category2.name })
+          @existing2.reload.price.should == 3.2
+        end
+
       end
+
     end
   end
 
@@ -98,6 +134,50 @@ describe "an act_as_importable model" do
       Item.import_record(row)
       Item.first.category.should == @category
     end
+  end
+
+  describe "default_values option" do
+    let(:row) { {:name => 'Beer'} }
+
+    it "should assign default values to new record" do
+      Item.import_record(row, :default_values => { :price => 3.2 })
+      Item.first.price.should == 3.2
+    end
+
+    it "should assign default values to updated record" do
+      Item.create!(:name => 'Beer', :price => 1.0)
+      Item.import_record(row, :uid => :name, :default_values => {:price => 3.2})
+      Item.first.price.should == 3.2
+    end
+
+    it "should not override row values" do
+      row[:price] = 4.1
+      Item.import_record(row, :default_values => {:price => 3.2})
+      Item.first.price.should == 4.1
+    end
+
+    describe "associations" do
+      let(:category) { Category.new(:name => 'Beverage') }
+
+      it "should assign default association value to new record" do
+        Item.import_record(row, :default_values => {:category => category})
+        Item.first.category.should == category
+      end
+
+      it "should assign default association value to updated record" do
+        Item.create!(:name => 'Beer', :price => 1.0)
+        Item.import_record(row, :uid => :name, :default_values => {:category => category})
+        Item.first.category.should == category
+      end
+
+      it "should not override row values" do
+        other_category = Category.create!(:name => 'Food & Beverage')
+        row['category.name'] = other_category.name
+        Item.import_record(row, :default_values => {'category.name' => category.name})
+        Item.first.category.should == other_category
+      end
+    end
+
   end
 
   describe "#filter_columns" do
