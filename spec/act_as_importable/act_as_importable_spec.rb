@@ -110,13 +110,13 @@ describe "an act_as_importable model" do
         end
 
         it "should match existing records with multiple uid columns" do
-          Item.import_record(row, :uid => [:name, :'category.name'])
+          Item.import_record(row, :uid => [:name, :category])
           @existing2.reload.price.should == 3.2
         end
 
         it "should allow uid column value to come from default values" do
           row = { :name => 'Beer', :price => 3.2 }
-          Item.import_record(row, :uid => [:name, :'category.name'], :default_values => { :'category.name' => category2.name })
+          Item.import_record(row, :uid => [:name, :category], :default_values => { :'category.name' => category2.name })
           @existing2.reload.price.should == 3.2
         end
 
@@ -181,7 +181,7 @@ describe "an act_as_importable model" do
   end
 
   describe "#filter_columns" do
-    let(:row) { {:name => 'Beer', :price => 2.5} }
+    let(:row) { {:name => 'Beer', :price => 2.5}.with_indifferent_access }
 
     it 'should filter columns when importing each record' do
       Item.should_receive(:filter_columns).with(row, default_options).and_return(row)
@@ -189,15 +189,15 @@ describe "an act_as_importable model" do
     end
 
     it "should not modify row if no options provided" do
-      Item.filter_columns(row).should == {:name => 'Beer', :price => 2.5}
+      Item.filter_columns(row).should == row
     end
 
     it "should remove columns specified by the :except option" do
-      Item.filter_columns(row, :except => :price).should == {:name => 'Beer'}
+      Item.filter_columns(row, :except => :price).should == {'name' => 'Beer'}
     end
 
     it "should remove columns not specified by the :only option" do
-      Item.filter_columns(row, :only => :price).should == {:price => 2.5}
+      Item.filter_columns(row, :only => :price).should == {'price' => 2.5}
     end
   end
 

@@ -13,9 +13,8 @@ module ActAsImportable
 
       def import_csv_text(text, options = {})
         csv = ::CSV.parse(text, :headers => true)
-        results = csv.map do |row|
-          row = row.to_hash.with_indifferent_access
-          import_record(row, options)
+        csv.map do |row|
+          import_record(row.to_hash, options)
         end
       end
 
@@ -25,22 +24,21 @@ module ActAsImportable
       # If uid is set to nil it will import the row data as a new record.
       def import_record(row, options = {})
         options.reverse_merge!(@default_import_options)
+        row = row.with_indifferent_access
         row.reverse_merge!(options[:default_values]) if options[:default_values]
+        convert_key_paths_to_values!(row)
         row = filter_columns(row, options)
-        record = find_or_create_by_uid(uid_values(row, options))
+        record = find_or_create_by_uids(uid_values(row, options))
         remove_uid_values_from_row(row, options)
-        update_record(record, row)
-        record.save!
-      end
-
-      def update_record(record, row)
-        update_associations(record, row)
         record.update_attributes(row)
+        record.save
       end
 
       def filter_columns(row, options = {})
-        row = row.reject { |key, value| Array(options[:except]).include? key } if options[:except]
-        row = row.select { |key, value| Array(options[:only]).include? key } if options[:only]
+        except = Array(options[:except]).map { |i| i.to_s }
+        only = Array(options[:only]).map { |i| i.to_s }
+        row = row.reject { |key, value| except.include? key.to_s } if except.present?
+        row = row.select { |key, value| only.include? key.to_s } if only.present?
         row
       end
 
@@ -54,34 +52,16 @@ module ActAsImportable
         end
       end
 
-      def update_associations(record, row)
-        row.each_key do |key|
-          key = key.to_s
-          if key.include?('.')
-            update_association(record, key, row[key])
-            row.delete(key)
-          end
-        end
-      end
-
-      def update_association(record, key, value)
-        association_name = key.split('.').first
-        uid_field = key.split('.').last
-        value = find_association_value_with_attribute(association_name, uid_field => value)
-        record.send("#{association_name}=", value) if value
-      end
-
       def find_association_value_with_attribute(name, attribute)
         association = self.reflect_on_association(name.to_sym)
         association.klass.where(attribute).first
       end
 
-      # Note: This will be available by default in rails 4
-      def find_or_create_by_uid(attributes, &block)
-        find_by_uid(attributes) || create(attributes, &block)
+      def find_or_create_by_uids(attributes, &block)
+        find_by_uids(attributes) || create(attributes, &block)
       end
 
-      def find_by_uid(attributes)
+      def find_by_uids(attributes)
         attributes.inject(self.scoped.readonly(false)) { |scope, key_value|
           add_scope_for_field(scope, key_value[0].to_s, key_value[1])
         }.first
@@ -89,12 +69,20 @@ module ActAsImportable
 
       def add_scope_for_field(scope, field, value)
         return scope unless value
-        if field.include?('.')
-          association = field.split('.').first
-          field_name = field.split('.').last
-          scope.joins(association.to_sym).where("#{association.pluralize}.#{field_name} = ?", value)
-        else
-          scope.where("#{self.table_name}.#{field} = ?", value)
+        if (association = self.reflect_on_association(field.to_sym))
+          field = association.foreign_key
+          value = value.id
+        end
+        scope.where("#{self.table_name}.#{field} = ?", value)
+      end
+
+      # TODO: update this to support finding the association value with multiple columns
+      def convert_key_paths_to_values!(row)
+        key_path_attributes = row.select { |k,v| k.to_s.include? '.' }
+        key_path_attributes.each do |key, value|
+          association_name, uid_field = key.to_s.split('.')
+          row[association_name.to_sym] = find_association_value_with_attribute(association_name, uid_field => value)
+          row.delete(key.to_sym)
         end
       end
 
