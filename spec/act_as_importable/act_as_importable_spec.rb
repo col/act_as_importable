@@ -57,15 +57,24 @@ describe "an act_as_importable model" do
       Item.should_receive(:import_csv_text).with(File.read(file), {})
       Item.import_csv_file(file)
     end
+    it "should return an array of imported records" do
+      Item.import_csv_file(file).should == Item.all.to_a
+    end
   end
 
   describe "import csv text" do
     let(:text) { "name,price\nBeer,2.5\nApple,0.5" }
+
     it 'should call import_record with row hashes' do
       Item.should_receive(:import_record).with({'name' => 'Beer', 'price' => '2.5'}, {}).once
       Item.should_receive(:import_record).with({'name' => 'Apple', 'price' => '0.5'}, {}).once
       Item.import_csv_text(text)
     end
+
+    it "should return an array of imported records" do
+      Item.import_csv_text(text).should == Item.all.to_a
+    end
+
   end
 
   describe "import record" do
@@ -73,6 +82,10 @@ describe "an act_as_importable model" do
 
     it 'should import an item' do
       expect { Item.import_record(row) }.to change{Item.count}.by(1)
+    end
+
+    it 'should return the imported item' do
+      Item.import_record(row).should be_a Item
     end
 
     describe "unique identifier (uid) option" do

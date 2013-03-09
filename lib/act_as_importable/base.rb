@@ -32,6 +32,7 @@ module ActAsImportable
         remove_uid_values_from_row(row, options)
         record.update_attributes(row)
         record.save
+        record
       end
 
       def filter_columns(row, options = {})
