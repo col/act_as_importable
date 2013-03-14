@@ -8,7 +8,7 @@ module ActAsImportable
     module ClassMethods
 
       def import_csv_file(file, options = {})
-        import_csv_text(File.read(file), options)
+        import_csv_text(read_file(file, options), options)
       end
 
       def import_csv_text(text, options = {})
@@ -84,6 +84,14 @@ module ActAsImportable
           association_name, uid_field = key.to_s.split('.')
           row[association_name.to_sym] = find_association_value_with_attribute(association_name, uid_field => value)
           row.delete(key.to_sym)
+        end
+      end
+
+      def read_file(file, options = {})
+        if options[:encoding]
+          File.read(file, :encoding => options[:encoding])
+        else
+          File.read(file)
         end
       end
 
