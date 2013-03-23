@@ -74,7 +74,22 @@ describe "an act_as_importable model" do
     it "should return an array of imported records" do
       Item.import_csv_text(text).should == Item.all.to_a
     end
+  end
 
+  describe "import data" do
+    let(:beer) { { :name => 'Beer', :price => 2.5 } }
+    let(:apple) { {:name => 'Apple', :price => 0.5} }
+    let(:data) { [beer, apple] }
+
+    it 'should call import_record with row hashes' do
+      Item.should_receive(:import_record).with(beer, {}).once
+      Item.should_receive(:import_record).with(apple, {}).once
+      Item.import_data(data)
+    end
+
+    it "should return an array of imported records" do
+      Item.import_data(data).should == Item.all.to_a
+    end
   end
 
   describe "import record" do

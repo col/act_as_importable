@@ -18,6 +18,12 @@ module ActAsImportable
         end
       end
 
+      def import_data(data, options = {})
+        data.map do |row|
+          import_record(row, options)
+        end
+      end
+
       # Creates or updates a model record
       # Existing records are found by the column(s) specified by the :uid option (default 'id').
       # If the values for the uid columns are not provided the row will be ignored.
@@ -31,7 +37,9 @@ module ActAsImportable
         record = find_or_create_by_uids(uid_values(row, options))
         remove_uid_values_from_row(row, options)
         record.update_attributes(row)
-        record.save
+        unless record.save
+          Rails.logger.error(record.errors.full_messages)
+        end
         record
       end
 
