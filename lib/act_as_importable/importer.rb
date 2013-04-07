@@ -4,6 +4,7 @@ module ActAsImportable
     def initialize(options = {})
       @default_options = options
       @imported_records = []
+      @errors = []
     end
 
     def options
@@ -20,11 +21,21 @@ module ActAsImportable
       row = prepare_row_for_import(row)
       record = find_or_create_record(row)
       record.update_attributes(row)
-      unless record.save
-        Rails.logger.error(record.errors.full_messages)
-      end
+      record.save
       imported_records << record
       record
+    rescue Exception => e
+      record = model_class.new
+      # Assign the valid attributes (without saving)
+      record.assign_attributes(row.select { |k,v| record.attributes.keys.include? k })
+      record.errors.add :base, e.message
+      record.errors.add :base, "Row Data: #{row}"
+      imported_records << record
+      record
+    end
+
+    def missing_uid_values(row)
+      uid_values(row).select { |k, v| v.blank? }
     end
 
     def imported_records
@@ -32,11 +43,13 @@ module ActAsImportable
     end
 
     def successful_imports
-      imported_records.select(&:valid?)
+      # Note: We don't want to re-validate the objects.
+      imported_records.select { |r| r.errors.empty? }
     end
 
     def failed_imports
-      imported_records.reject(&:valid?)
+      # Note: We don't want to re-validate the objects.
+      imported_records.reject { |r| r.errors.empty? }
     end
 
     def model_class
@@ -65,8 +78,14 @@ module ActAsImportable
       row.reverse_merge!(options[:default_values]) if options[:default_values]
     end
 
+    def uid_keys
+      Array(options[:uid])
+    end
+
     def uid_values(row)
-      Hash[Array(options[:uid]).map { |k| [k, row[k.to_sym]] }]
+      uid_keys.each_with_object({}) do |key, result|
+        result[key] = row[key.to_sym]
+      end
     end
 
     def remove_uid_values_from_row(row, options = {})
@@ -81,6 +100,10 @@ module ActAsImportable
     end
 
     def find_or_create_record(row)
+      if missing_uid_values(row).present?
+        raise "Missing the following uids attributes. #{missing_uid_values(row).keys}"
+      end
+
       record = find_or_create_by_uids(uid_values(row))
       remove_uid_values_from_row(row)
       record
@@ -91,9 +114,13 @@ module ActAsImportable
     end
 
     def find_by_uids(attributes)
-      attributes.inject(model_class.scoped.readonly(false)) { |scope, key_value|
+      results = attributes.inject(model_class.scoped.readonly(false)) { |scope, key_value|
         add_scope_for_field(scope, key_value[0].to_s, key_value[1])
-      }.first
+      }
+      if results.count > 1
+        raise "Multiple records found with uid attributes. Attributes: #{attributes}"
+      end
+      results.first
     end
 
     def add_scope_for_field(scope, field, value)
@@ -110,7 +137,11 @@ module ActAsImportable
       key_path_attributes = row.select { |k, v| k.to_s.include? '.' }
       key_path_attributes.each do |key, value|
         association_name, uid_field = key.to_s.split('.')
-        row[association_name.to_sym] = find_association_value_with_attribute(association_name, uid_field => value)
+        association_value = find_association_value_with_attribute(association_name, uid_field => value)
+        if association_value.blank?
+          raise "Failed to find #{association_name} with #{uid_field} = #{value}"
+        end
+        row[association_name.to_sym] = association_value
         row.delete(key.to_sym)
       end
     end
