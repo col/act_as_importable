@@ -10,6 +10,7 @@ module ActAsImportable::Config
 
       @default_import_options = options
       @default_import_options[:uid] ||= :id
+      @default_import_options[:model_class] ||= self
 
       # create a reader on the class to access the field name
       class << self;

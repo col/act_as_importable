@@ -19,3 +19,29 @@ ActiveRecord::Base.establish_connection(
 
 RSpec.configure do |config|
 end
+
+# create the tables for the tests
+ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS 'categories'")
+ActiveRecord::Base.connection.create_table(:categories) do |t|
+  t.string :name
+end
+
+class Category < ActiveRecord::Base
+  has_many :items
+end
+
+ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS 'items'")
+ActiveRecord::Base.connection.create_table(:items) do |t|
+  t.integer :category_id
+  t.string :name
+  t.float :price
+end
+
+class Item < ActiveRecord::Base
+  # This line isn't needed in a real Rails app.
+  include ActAsImportable::Config
+
+  act_as_importable :uid => 'name'
+
+  belongs_to :category
+end

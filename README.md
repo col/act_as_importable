@@ -28,6 +28,8 @@ User.import_csv_file('/path/to/file.csv')
 User.import_csv_text(csv_text)
 # or
 User.import_data(array_of_hashes)
+# or
+User.import_record(hash)
 ```
 
 ## CSV File Format
