@@ -29,7 +29,7 @@ module ActAsImportable
       # Assign the valid attributes (without saving)
       record.assign_attributes(row.select { |k,v| record.attributes.keys.include? k })
       record.errors.add :base, e.message
-      record.errors.add :base, "Row Data: #{row}"
+      record.import_data = row if record.respond_to? :import_data=
       imported_records << record
       record
     end

@@ -6,6 +6,13 @@ module ActAsImportable
   module Base
     extend ActiveSupport::Concern
 
+    included do
+
+      # This is used to store the data being import when there is an error
+      attr_accessor :import_data
+
+    end
+
     module ClassMethods
 
       def import_csv_file(file, options = {})
