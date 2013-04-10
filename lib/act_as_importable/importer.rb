@@ -15,6 +15,24 @@ module ActAsImportable
       data.map do |row|
         import_record(row)
       end
+      delete_missing_records if options[:delete_missing_records]
+    end
+
+    def existing_record_scope
+      options[:existing_record_scope] || model_class.all
+    end
+
+    def existing_record_ids
+      existing_record_scope.map(&:id)
+    end
+
+    def record_ids_to_delete
+      imported_ids = successful_imports.map(&:id)
+      existing_record_ids.reject { |id| imported_ids.include? id }
+    end
+
+    def delete_missing_records
+      model_class.delete(record_ids_to_delete)
     end
 
     def import_record(row)

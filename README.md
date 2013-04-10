@@ -56,6 +56,17 @@ User.import_csv_file('/path/to/file.csv', :uid => :email)
 This will find an existing record with a matching email address and update their name.
 If no record exists it will create a new one.
 
+## Other options
+
+* uid (default: 'uid')
+* except (default: nil)
+* only (default: nil)
+* default_values (default: nil)
+* delete_missing_records (default: false)
+* existing_record_scope (default: Model.all)
+
+
+
 
 ## Test
 

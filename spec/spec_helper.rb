@@ -44,4 +44,8 @@ class Item < ActiveRecord::Base
   act_as_importable :uid => 'name'
 
   belongs_to :category
+
+  def self.for_category(category)
+    where(:category_id => category.id)
+  end
 end
